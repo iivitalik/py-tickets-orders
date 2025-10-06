@@ -2,8 +2,15 @@ from rest_framework import serializers
 from django.db import transaction
 from django.core.exceptions import ValidationError
 
-from cinema.models import (Genre, Actor, CinemaHall, Movie,
-                           MovieSession, Order, Ticket)
+from cinema.models import (
+    Genre,
+    Actor,
+    CinemaHall,
+    Movie,
+    MovieSession,
+    Order,
+    Ticket
+)
 
 
 class GenreSerializer(serializers.ModelSerializer):
@@ -21,15 +28,13 @@ class ActorSerializer(serializers.ModelSerializer):
 class CinemaHallSerializer(serializers.ModelSerializer):
     class Meta:
         model = CinemaHall
-        fields = ("id", "name", "rows",
-                  "seats_in_row", "capacity")
+        fields = ("id", "name", "rows", "seats_in_row", "capacity")
 
 
 class MovieSerializer(serializers.ModelSerializer):
     class Meta:
         model = Movie
-        fields = ("id", "title", "description",
-                  "duration", "genres", "actors")
+        fields = ("id", "title", "description", "duration", "genres", "actors")
 
 
 class MovieListSerializer(MovieSerializer):
@@ -47,8 +52,7 @@ class MovieDetailSerializer(MovieSerializer):
 
     class Meta:
         model = Movie
-        fields = ("id", "title", "description",
-                  "duration", "genres", "actors")
+        fields = ("id", "title", "description", "duration", "genres", "actors")
 
 
 class MovieSessionSerializer(serializers.ModelSerializer):
@@ -126,9 +130,9 @@ class OrderCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         with transaction.atomic():
-            tickets_data = validated_data.pop('tickets')
+            tickets_data = validated_data.pop("tickets")
             order = Order.objects.create(
-                user=self.context['request'].user,
+                user=self.context["request"].user,
                 **validated_data
             )
 
@@ -139,17 +143,19 @@ class OrderCreateSerializer(serializers.ModelSerializer):
 
     def validate_tickets(self, tickets):
         if not tickets:
-            raise serializers.ValidationError("At least one ticket is required.")
+            raise serializers.ValidationError(
+                "At least one ticket is required."
+            )
 
         for ticket_data in tickets:
-            movie_session = ticket_data['movie_session']
-            row = ticket_data['row']
-            seat = ticket_data['seat']
+            movie_session = ticket_data["movie_session"]
+            row = ticket_data["row"]
+            seat = ticket_data["seat"]
 
             if Ticket.objects.filter(
-                    movie_session=movie_session,
-                    row=row,
-                    seat=seat
+                movie_session=movie_session,
+                row=row,
+                seat=seat
             ).exists():
                 raise serializers.ValidationError(
                     f"Seat {seat} in row {row} is already taken for "
