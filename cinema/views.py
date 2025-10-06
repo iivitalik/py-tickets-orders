@@ -67,13 +67,13 @@ class MovieViewSet(viewsets.ModelViewSet):
 
         genres = self.request.query_params.get("genres")
         if genres:
-            queryset = queryset.filter(genres__name=genres).distinct()
+            queryset = queryset.filter(genres__name__iexact=genres).distinct()
 
         actors = self.request.query_params.get("actors")
         if actors:
             queryset = queryset.filter(
-                Q(actors__first_name=actors)
-                | Q(actors__last_name=actors)
+                Q(actors__first_name__iexact=actors)
+                | Q(actors__last_name__iexact=actors)
             ).distinct()
 
         return queryset
