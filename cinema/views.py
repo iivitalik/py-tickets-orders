@@ -128,7 +128,6 @@ class MovieSessionViewSet(viewsets.ModelViewSet):
 class OrderViewSet(viewsets.ModelViewSet):
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
-    pagination_class = PageNumberPagination
 
     def get_queryset(self):
         return Order.objects.filter(
