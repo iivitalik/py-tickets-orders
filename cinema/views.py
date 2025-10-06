@@ -75,8 +75,8 @@ class MovieViewSet(viewsets.ModelViewSet):
         actors = self.request.query_params.get("actors")
         if actors:
             queryset = queryset.filter(
-                Q(actors__first_name__icontains=actors) |
-                Q(actors__last_name__icontains=actors)
+                Q(actors__first_name__icontains=actors)
+                | Q(actors__last_name__icontains=actors)
             ).distinct()
 
         return queryset
