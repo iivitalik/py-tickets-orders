@@ -52,6 +52,15 @@ class MovieViewSet(viewsets.ModelViewSet):
     queryset = Movie.objects.all()
     serializer_class = MovieSerializer
 
+    def get_serializer_class(self):
+        if self.action == "list":
+            return MovieListSerializer
+
+        if self.action == "retrieve":
+            return MovieDetailSerializer
+
+        return MovieSerializer
+
     def get_queryset(self):
         queryset = Movie.objects.all()
 
@@ -61,19 +70,14 @@ class MovieViewSet(viewsets.ModelViewSet):
 
         genres = self.request.query_params.get("genres")
         if genres:
-            genre_list = [genre.strip() for genre in genres.split(",")]
-            queryset = queryset.filter(genres__name__in=genre_list).distinct()
+            queryset = queryset.filter(genres__name=genres).distinct()
 
         actors = self.request.query_params.get("actors")
         if actors:
-            actor_names = [name.strip() for name in actors.split(",")]
-            query = Q()
-            for actor_name in actor_names:
-                name_parts = actor_name.split()
-                for part in name_parts:
-                    query |= Q(actors__first_name__icontains=part)
-                    query |= Q(actors__last_name__icontains=part)
-            queryset = queryset.filter(query).distinct()
+            queryset = queryset.filter(
+                Q(actors__first_name__icontains=actors) |
+                Q(actors__last_name__icontains=actors)
+            ).distinct()
 
         return queryset
 
@@ -120,7 +124,6 @@ class MovieSessionViewSet(viewsets.ModelViewSet):
 class OrderViewSet(viewsets.ModelViewSet):
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
-    pagination_class = PageNumberPagination
 
     def get_queryset(self):
         return Order.objects.filter(
