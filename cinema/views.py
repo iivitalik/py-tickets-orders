@@ -2,7 +2,6 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from django.db.models import Q
 
@@ -53,7 +52,6 @@ class MovieViewSet(viewsets.ModelViewSet):
     serializer_class = MovieSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter]
     search_fields = ["title"]
-    filterset_fields = ["genres", "actors"]
 
     def get_queryset(self):
         queryset = Movie.objects.all()
@@ -93,7 +91,6 @@ class MovieSessionViewSet(viewsets.ModelViewSet):
     queryset = MovieSession.objects.all()
     serializer_class = MovieSessionSerializer
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ["movie"]
 
     def get_queryset(self):
         queryset = MovieSession.objects.select_related(
