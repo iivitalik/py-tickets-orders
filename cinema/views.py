@@ -32,6 +32,21 @@ from cinema.serializers import (
 )
 
 
+queryset = Movie.objects.all()
+
+actors = self.request.query_params.getlist("actors")
+if actors:
+    queryset = queryset.filter(actors__name__in=actors).distinct()
+
+genres = self.request.query_params.getlist("genres")
+if genres:
+    queryset = queryset.filter(genres__name__in=genres).distinct()
+
+title = self.request.query_params.get("title")
+if title:
+    queryset = queryset.filter(title__icontains=title)
+
+
 class GenreViewSet(viewsets.ModelViewSet):
     queryset = Genre.objects.all()
     serializer_class = GenreSerializer
@@ -82,6 +97,14 @@ class MovieViewSet(viewsets.ModelViewSet):
 class MovieSessionViewSet(viewsets.ModelViewSet):
     queryset = MovieSession.objects.all()
     serializer_class = MovieSessionSerializer
+
+    date = self.request.query_params.get('date')
+    if date:
+        queryset = queryset.filter(show_time__date=date)
+
+    movie_id = self.request.query_params.get('movie')
+    if movie_id:
+        queryset = queryset.filter(movie__id=movie_id)
 
     def get_queryset(self):
         queryset = MovieSession.objects.select_related(
