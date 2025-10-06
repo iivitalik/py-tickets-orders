@@ -86,7 +86,8 @@ class MovieViewSet(viewsets.ModelViewSet):
 
 
 class MovieSessionViewSet(viewsets.ModelViewSet):
-    queryset = MovieSession.objects.select_related("movie", "cinema_hall").prefetch_related("tickets")
+    queryset = MovieSession.objects.select_related(
+        "movie", "cinema_hall").prefetch_related("tickets")
     serializer_class = MovieSessionSerializer
     pagination_class = None
 
@@ -111,7 +112,8 @@ class MovieSessionViewSet(viewsets.ModelViewSet):
     def taken_places(self, request, pk=None):
         movie_session = self.get_object()
         tickets = movie_session.tickets.all()
-        taken_places = [{"row": ticket.row, "seat": ticket.seat} for ticket in tickets]
+        taken_places = [{"row": ticket.row,
+                         "seat": ticket.seat} for ticket in tickets]
         return Response(taken_places)
 
 
