@@ -4,16 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
 
-from cinema.models import (
-    Genre,
-    Actor,
-    CinemaHall,
-    Movie,
-    MovieSession,
-    Order,
-    Ticket
-)
-
+from cinema.models import Genre, Actor, CinemaHall, Movie, MovieSession, Order
 from cinema.serializers import (
     GenreSerializer,
     ActorSerializer,
@@ -32,19 +23,19 @@ from cinema.serializers import (
 class GenreViewSet(viewsets.ModelViewSet):
     queryset = Genre.objects.all()
     serializer_class = GenreSerializer
-    pagination_class = PageNumberPagination
+    pagination_class = None
 
 
 class ActorViewSet(viewsets.ModelViewSet):
     queryset = Actor.objects.all()
     serializer_class = ActorSerializer
-    pagination_class = PageNumberPagination
+    pagination_class = None
 
 
 class CinemaHallViewSet(viewsets.ModelViewSet):
     queryset = CinemaHall.objects.all()
     serializer_class = CinemaHallSerializer
-    pagination_class = PageNumberPagination
+    pagination_class = None
 
 
 class MovieViewSet(viewsets.ModelViewSet):
@@ -61,45 +52,27 @@ class MovieViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = Movie.objects.all()
-
         title = self.request.query_params.get("title")
         if title:
             queryset = queryset.filter(title__icontains=title)
 
-        genres_param = self.request.query_params.get("genres")
-        if genres_param:
-            try:
-                genres = [int(g) for g in genres_param.split(",") if g]
-                queryset = queryset.filter(genres__id__in=genres).distinct()
-            except ValueError:
-                pass
+        genres = self.request.query_params.get("genres")
+        if genres:
+            genre_ids = [int(g) for g in genres.split(",") if g.isdigit()]
+            queryset = queryset.filter(genres__id__in=genre_ids).distinct()
 
-        actors_param = self.request.query_params.get("actors")
-        if actors_param:
-            try:
-                actors = [int(a) for a in actors_param.split(",") if a]
-                queryset = queryset.filter(actors__id__in=actors).distinct()
-            except ValueError:
-                pass
+        actors = self.request.query_params.get("actors")
+        if actors:
+            actor_ids = [int(a) for a in actors.split(",") if a.isdigit()]
+            queryset = queryset.filter(actors__id__in=actor_ids).distinct()
 
         return queryset
 
 
 class MovieSessionViewSet(viewsets.ModelViewSet):
-    queryset = MovieSession.objects.select_related(
-        "movie", "cinema_hall").prefetch_related("tickets")
+    queryset = MovieSession.objects.select_related("movie", "cinema_hall").prefetch_related("tickets")
     serializer_class = MovieSessionSerializer
     pagination_class = None
-
-    def get_queryset(self):
-        queryset = self.queryset
-        date = self.request.query_params.get("date")
-        if date:
-            queryset = queryset.filter(show_time__date=date)
-        movie_id = self.request.query_params.get("movie")
-        if movie_id:
-            queryset = queryset.filter(movie_id=movie_id)
-        return queryset
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -108,13 +81,25 @@ class MovieSessionViewSet(viewsets.ModelViewSet):
             return MovieSessionDetailWithPlacesSerializer
         return MovieSessionSerializer
 
+    def get_queryset(self):
+        queryset = self.queryset
+        movie = self.request.query_params.get("movie")
+        date = self.request.query_params.get("date")
+
+        if movie:
+            queryset = queryset.filter(movie_id=movie)
+        if date:
+            queryset = queryset.filter(show_time__date=date)
+
+        return queryset
+
     @action(detail=True, methods=["get"])
     def taken_places(self, request, pk=None):
         movie_session = self.get_object()
         tickets = movie_session.tickets.all()
-        taken_places = [{"row": ticket.row,
-                         "seat": ticket.seat} for ticket in tickets]
-        return Response(taken_places)
+        return Response([
+            {"row": t.row, "seat": t.seat} for t in tickets
+        ])
 
 
 class OrderViewSet(viewsets.ModelViewSet):
