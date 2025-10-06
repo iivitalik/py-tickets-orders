@@ -1,9 +1,6 @@
-from rest_framework import viewsets
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.pagination import PageNumberPagination
-from django.db.models import Q
+from rest_framework import serializers
+from django.db import transaction
+from django.core.exceptions import ValidationError
 
 from cinema.models import (
     Genre,
@@ -15,124 +12,199 @@ from cinema.models import (
     Ticket
 )
 
-from cinema.serializers import (
-    GenreSerializer,
-    ActorSerializer,
-    CinemaHallSerializer,
-    MovieSerializer,
-    MovieSessionSerializer,
-    MovieSessionListSerializer,
-    MovieDetailSerializer,
-    MovieSessionDetailSerializer,
-    MovieListSerializer,
-    OrderSerializer,
-    OrderCreateSerializer,
-    MovieSessionListWithTicketsSerializer,
-    MovieSessionDetailWithPlacesSerializer,
-)
+
+class GenreSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Genre
+        fields = ("id", "name")
 
 
-class GenreViewSet(viewsets.ModelViewSet):
-    queryset = Genre.objects.all()
-    serializer_class = GenreSerializer
+class ActorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Actor
+        fields = ("id", "first_name", "last_name", "full_name")
 
 
-class ActorViewSet(viewsets.ModelViewSet):
-    queryset = Actor.objects.all()
-    serializer_class = ActorSerializer
+class CinemaHallSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CinemaHall
+        fields = ("id", "name", "rows", "seats_in_row", "capacity")
 
 
-class CinemaHallViewSet(viewsets.ModelViewSet):
-    queryset = CinemaHall.objects.all()
-    serializer_class = CinemaHallSerializer
+class MovieSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Movie
+        fields = ("id", "title", "description", "duration", "genres", "actors")
 
 
-class MovieViewSet(viewsets.ModelViewSet):
-    queryset = Movie.objects.all()
-    serializer_class = MovieSerializer
-
-    def get_serializer_class(self):
-        if self.action == "list":
-            return MovieListSerializer
-        if self.action == "retrieve":
-            return MovieDetailSerializer
-        return MovieSerializer
-
-    def get_queryset(self):
-        queryset = Movie.objects.all()
-
-        title = self.request.query_params.get("title")
-        if title:
-            queryset = queryset.filter(title__icontains=title)
-
-        genres = self.request.query_params.get("genres")
-        if genres:
-            queryset = queryset.filter(genres__name__in=[genres]).distinct()
-
-        actors = self.request.query_params.get("actors")
-        if actors:
-            queryset = queryset.filter(
-                Q(actors__first_name__icontains=actors)
-                | Q(actors__last_name__icontains=actors)
-            ).distinct()
-
-        return queryset
+class MovieListSerializer(MovieSerializer):
+    genres = serializers.SlugRelatedField(
+        many=True, read_only=True, slug_field="name"
+    )
+    actors = serializers.SlugRelatedField(
+        many=True, read_only=True, slug_field="full_name"
+    )
 
 
-class MovieSessionViewSet(viewsets.ModelViewSet):
-    queryset = MovieSession.objects.all()
-    serializer_class = MovieSessionSerializer
+class MovieDetailSerializer(MovieSerializer):
+    genres = GenreSerializer(many=True, read_only=True)
+    actors = ActorSerializer(many=True, read_only=True)
 
-    def get_queryset(self):
-        queryset = MovieSession.objects.select_related(
-            "movie", "cinema_hall"
-        ).prefetch_related("tickets")
+    class Meta:
+        model = Movie
+        fields = ("id", "title", "description", "duration", "genres", "actors")
 
-        date = self.request.query_params.get("date")
-        if date:
-            queryset = queryset.filter(show_time__date=date)
 
-        movie_id = self.request.query_params.get("movie")
-        if movie_id:
-            queryset = queryset.filter(movie_id=movie_id)
+class MovieSessionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MovieSession
+        fields = ("id", "show_time", "movie", "cinema_hall")
 
-        return queryset
 
-    def get_serializer_class(self):
-        if self.action == "list":
-            return MovieSessionListWithTicketsSerializer
-        if self.action == "retrieve":
-            return MovieSessionDetailWithPlacesSerializer
-        return MovieSessionSerializer
+class MovieSessionListSerializer(MovieSessionSerializer):
+    movie_title = serializers.CharField(source="movie.title", read_only=True)
+    cinema_hall_name = serializers.CharField(
+        source="cinema_hall.name", read_only=True
+    )
+    cinema_hall_capacity = serializers.IntegerField(
+        source="cinema_hall.capacity", read_only=True
+    )
 
-    @action(detail=True, methods=["get"])
-    def taken_places(self, request, pk=None):
-        movie_session = self.get_object()
-        tickets = movie_session.tickets.all()
-        taken_places = [
+    class Meta:
+        model = MovieSession
+        fields = (
+            "id",
+            "show_time",
+            "movie_title",
+            "cinema_hall_name",
+            "cinema_hall_capacity",
+        )
+
+
+class MovieSessionDetailSerializer(MovieSessionSerializer):
+    movie = MovieListSerializer(many=False, read_only=True)
+    cinema_hall = CinemaHallSerializer(many=False, read_only=True)
+
+    class Meta:
+        model = MovieSession
+        fields = ("id", "show_time", "movie", "cinema_hall")
+
+
+class TicketSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Ticket
+        fields = ("id", "row", "seat", "movie_session")
+
+
+class TicketDetailSerializer(serializers.ModelSerializer):
+    movie_session = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Ticket
+        fields = ("id", "row", "seat", "movie_session")
+
+    def get_movie_session(self, obj):
+        return {
+            "id": obj.movie_session.id,
+            "show_time": obj.movie_session.show_time,
+            "movie_title": obj.movie_session.movie.title,
+            "cinema_hall_name": obj.movie_session.cinema_hall.name,
+            "cinema_hall_capacity": obj.movie_session.cinema_hall.capacity
+        }
+
+
+class OrderSerializer(serializers.ModelSerializer):
+    tickets = TicketDetailSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Order
+        fields = ("id", "tickets", "created_at")
+
+
+class OrderCreateSerializer(serializers.ModelSerializer):
+    tickets = TicketSerializer(many=True)
+
+    class Meta:
+        model = Order
+        fields = ("tickets",)
+
+    def create(self, validated_data):
+        with transaction.atomic():
+            tickets_data = validated_data.pop("tickets")
+            order = Order.objects.create(
+                user=self.context["request"].user,
+                **validated_data
+            )
+
+            for ticket_data in tickets_data:
+                Ticket.objects.create(order=order, **ticket_data)
+
+            return order
+
+    def validate_tickets(self, tickets):
+        if not tickets:
+            raise serializers.ValidationError(
+                "At least one ticket is required."
+            )
+
+        for ticket_data in tickets:
+            movie_session = ticket_data["movie_session"]
+            row = ticket_data["row"]
+            seat = ticket_data["seat"]
+
+            if Ticket.objects.filter(
+                movie_session=movie_session,
+                row=row,
+                seat=seat
+            ).exists():
+                raise serializers.ValidationError(
+                    f"Seat {seat} in row {row} is already taken for "
+                    f"this movie session."
+                )
+
+            cinema_hall = movie_session.cinema_hall
+            if row < 1 or row > cinema_hall.rows:
+                raise serializers.ValidationError(
+                    f"Row must be between 1 and {cinema_hall.rows}."
+                )
+            if seat < 1 or seat > cinema_hall.seats_in_row:
+                raise serializers.ValidationError(
+                    f"Seat must be between 1 and {cinema_hall.seats_in_row}."
+                )
+
+        return tickets
+
+
+class MovieSessionListWithTicketsSerializer(MovieSessionListSerializer):
+    tickets_available = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MovieSession
+        fields = (
+            "id",
+            "show_time",
+            "movie_title",
+            "cinema_hall_name",
+            "cinema_hall_capacity",
+            "tickets_available"
+        )
+
+    def get_tickets_available(self, obj):
+        total_seats = obj.cinema_hall.capacity
+        taken_seats = obj.tickets.count()
+        return total_seats - taken_seats
+
+
+class MovieSessionDetailWithPlacesSerializer(MovieSessionDetailSerializer):
+    taken_places = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MovieSession
+        fields = ("id", "show_time", "movie", "cinema_hall", "taken_places")
+
+    def get_taken_places(self, obj):
+        tickets = obj.tickets.all()
+        return [
             {"row": ticket.row, "seat": ticket.seat}
             for ticket in tickets
         ]
-        return Response(taken_places)
-
-
-class OrderViewSet(viewsets.ModelViewSet):
-    serializer_class = OrderSerializer
-    permission_classes = [IsAuthenticated]
-    pagination_class = PageNumberPagination
-
-    def get_queryset(self):
-        return Order.objects.filter(
-            user=self.request.user
-        ).prefetch_related(
-            "tickets__movie_session__movie",
-            "tickets__movie_session__cinema_hall"
-        )
-
-    def get_serializer_class(self):
-        if self.action == "create":
-            return OrderCreateSerializer
-        return OrderSerializer
-
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
