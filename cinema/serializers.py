@@ -186,13 +186,13 @@ class MovieSessionListWithTicketsSerializer(MovieSessionListSerializer):
             "movie_title",
             "cinema_hall_name",
             "cinema_hall_capacity",
-            "tickets_available"
+            "tickets_available",
         )
 
     def get_tickets_available(self, obj):
-        total_seats = obj.cinema_hall.capacity
-        taken_seats = obj.tickets.count()
-        return total_seats - taken_seats
+        capacity = obj.cinema_hall.rows * obj.cinema_hall.seats_in_row
+        taken = obj.tickets.count()
+        return capacity - taken
 
 
 class MovieSessionDetailWithPlacesSerializer(MovieSessionDetailSerializer):
