@@ -4,7 +4,6 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
-from rest_framework.pagination import BasePagination
 
 from cinema.models import (
     Genre,
@@ -33,14 +32,6 @@ from cinema.serializers import (
 )
 
 
-class NonePagination(BasePagination):
-    def paginate_queryset(self, queryset, request, view=None):
-        return None
-
-    def get_paginated_response(self, data):
-        return Response(data)
-
-
 class GenreViewSet(viewsets.ModelViewSet):
     queryset = Genre.objects.all()
     serializer_class = GenreSerializer
@@ -59,7 +50,6 @@ class CinemaHallViewSet(viewsets.ModelViewSet):
 class MovieViewSet(viewsets.ModelViewSet):
     queryset = Movie.objects.all()
     serializer_class = MovieSerializer
-    pagination_class = None
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -75,13 +65,21 @@ class MovieViewSet(viewsets.ModelViewSet):
         if title:
             queryset = queryset.filter(title__icontains=title)
 
-        genres = self.request.query_params.getlist("genres")
-        if genres:
-            queryset = queryset.filter(genres__id__in=genres).distinct()
+        genres_param = self.request.query_params.get("genres")
+        if genres_param:
+            try:
+                genres = [int(g) for g in genres_param.split(",")]
+                queryset = queryset.filter(genres__id__in=genres).distinct()
+            except ValueError:
+                pass
 
-        actors = self.request.query_params.getlist("actors")
-        if actors:
-            queryset = queryset.filter(actors__id__in=actors).distinct()
+        actors_param = self.request.query_params.get("actors")
+        if actors_param:
+            try:
+                actors = [int(a) for a in actors_param.split(",")]
+                queryset = queryset.filter(actors__id__in=actors).distinct()
+            except ValueError:
+                pass
 
         return queryset
 
@@ -89,7 +87,6 @@ class MovieViewSet(viewsets.ModelViewSet):
 class MovieSessionViewSet(viewsets.ModelViewSet):
     queryset = MovieSession.objects.all()
     serializer_class = MovieSessionSerializer
-    pagination_class = None
 
     def get_queryset(self):
         queryset = MovieSession.objects.select_related(
