@@ -4,6 +4,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
+from rest_framework.pagination import BasePagination
+from rest_framework.response import Response
 
 from cinema.models import (
     Genre,
@@ -32,6 +34,14 @@ from cinema.serializers import (
 )
 
 
+class NonePagination(BasePagination):
+    def paginate_queryset(self, queryset, request, view=None):
+        return None
+
+    def get_paginated_response(self, data):
+        return Response(data
+
+
 class GenreViewSet(viewsets.ModelViewSet):
     queryset = Genre.objects.all()
     serializer_class = GenreSerializer
@@ -50,7 +60,6 @@ class CinemaHallViewSet(viewsets.ModelViewSet):
 class MovieViewSet(viewsets.ModelViewSet):
     queryset = Movie.objects.all()
     serializer_class = MovieSerializer
-    pagination_class = PageNumberPagination
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -80,7 +89,6 @@ class MovieViewSet(viewsets.ModelViewSet):
 class MovieSessionViewSet(viewsets.ModelViewSet):
     queryset = MovieSession.objects.all()
     serializer_class = MovieSessionSerializer
-    pagination_class = PageNumberPagination
 
     def get_queryset(self):
         queryset = MovieSession.objects.select_related(
