@@ -50,7 +50,6 @@ class CinemaHallViewSet(viewsets.ModelViewSet):
 class MovieViewSet(viewsets.ModelViewSet):
     queryset = Movie.objects.all()
     serializer_class = MovieSerializer
-    search_fields = ["title"]
 
     def get_queryset(self):
         queryset = Movie.objects.all()
@@ -61,18 +60,19 @@ class MovieViewSet(viewsets.ModelViewSet):
 
         genres = self.request.query_params.get("genres")
         if genres:
-            genre_list = genres.split(",")
-            queryset = queryset.filter(
-                genres__name__in=genre_list
-            ).distinct()
+            genre_list = [genre.strip() for genre in genres.split(",")]
+            queryset = queryset.filter(genres__name__in=genre_list).distinct()
 
         actors = self.request.query_params.get("actors")
         if actors:
-            actor_list = actors.split(",")
-            queryset = queryset.filter(
-                Q(actors__first_name__icontains=actor_list[0])
-                | Q(actors__last_name__icontains=actor_list[0])
-            ).distinct()
+            actor_names = [name.strip() for name in actors.split(",")]
+            # Шукаємо акторів за повним ім'ям
+            query = Q()
+            for actor_name in actor_names:
+                query |= Q(actors__first_name__icontains=actor_name)
+                query |= Q(actors__last_name__icontains=actor_name)
+                query |= Q(actors__full_name__icontains=actor_name)
+            queryset = queryset.filter(query).distinct()
 
         return queryset
 
@@ -128,6 +128,7 @@ class MovieSessionViewSet(viewsets.ModelViewSet):
 class OrderViewSet(viewsets.ModelViewSet):
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = PageNumberPagination
 
     def get_queryset(self):
         return Order.objects.filter(
