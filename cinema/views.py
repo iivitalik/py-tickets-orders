@@ -67,13 +67,13 @@ class MovieViewSet(viewsets.ModelViewSet):
 
         genres = self.request.query_params.get("genres")
         if genres:
-            queryset = queryset.filter(genres__name=genres).distinct()
+            queryset = queryset.filter(genres__name__in=[genres]).distinct()
 
         actors = self.request.query_params.get("actors")
         if actors:
             queryset = queryset.filter(
-                Q(actors__first_name=actors)
-                | Q(actors__last_name=actors)
+                Q(actors__first_name__in=[actors])
+                | Q(actors__last_name__in=[actors])
             ).distinct()
 
         return queryset
@@ -119,6 +119,7 @@ class MovieSessionViewSet(viewsets.ModelViewSet):
 class OrderViewSet(viewsets.ModelViewSet):
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = PageNumberPagination
 
     def get_queryset(self):
         return Order.objects.filter(
