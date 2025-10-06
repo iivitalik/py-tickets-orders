@@ -3,7 +3,6 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
-from django.db.models import Q
 
 from cinema.models import (
     Genre,
@@ -20,11 +19,11 @@ from cinema.serializers import (
     ActorSerializer,
     CinemaHallSerializer,
     MovieSerializer,
-    MovieSessionSerializer,
     MovieDetailSerializer,
+    MovieListSerializer,
+    MovieSessionSerializer,
     MovieSessionListWithTicketsSerializer,
     MovieSessionDetailWithPlacesSerializer,
-    MovieListSerializer,
     OrderSerializer,
     OrderCreateSerializer,
 )
@@ -33,16 +32,19 @@ from cinema.serializers import (
 class GenreViewSet(viewsets.ModelViewSet):
     queryset = Genre.objects.all()
     serializer_class = GenreSerializer
+    pagination_class = PageNumberPagination
 
 
 class ActorViewSet(viewsets.ModelViewSet):
     queryset = Actor.objects.all()
     serializer_class = ActorSerializer
+    pagination_class = PageNumberPagination
 
 
 class CinemaHallViewSet(viewsets.ModelViewSet):
     queryset = CinemaHall.objects.all()
     serializer_class = CinemaHallSerializer
+    pagination_class = PageNumberPagination
 
 
 class MovieViewSet(viewsets.ModelViewSet):
@@ -59,6 +61,7 @@ class MovieViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = Movie.objects.all()
+
         title = self.request.query_params.get("title")
         if title:
             queryset = queryset.filter(title__icontains=title)
@@ -83,8 +86,7 @@ class MovieViewSet(viewsets.ModelViewSet):
 
 
 class MovieSessionViewSet(viewsets.ModelViewSet):
-    queryset = MovieSession.objects.select_related(
-        "movie", "cinema_hall").prefetch_related("tickets")
+    queryset = MovieSession.objects.select_related("movie", "cinema_hall").prefetch_related("tickets")
     serializer_class = MovieSessionSerializer
     pagination_class = None
 
@@ -109,8 +111,7 @@ class MovieSessionViewSet(viewsets.ModelViewSet):
     def taken_places(self, request, pk=None):
         movie_session = self.get_object()
         tickets = movie_session.tickets.all()
-        taken_places = [{"row": ticket.row,
-                         "seat": ticket.seat} for ticket in tickets]
+        taken_places = [{"row": ticket.row, "seat": ticket.seat} for ticket in tickets]
         return Response(taken_places)
 
 
