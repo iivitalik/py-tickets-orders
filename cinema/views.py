@@ -66,24 +66,15 @@ class MovieViewSet(viewsets.ModelViewSet):
         actors = self.request.query_params.get("actors")
         if actors:
             actor_names = [name.strip() for name in actors.split(",")]
-            # Шукаємо акторів за повним ім'ям
             query = Q()
             for actor_name in actor_names:
-                query |= Q(actors__first_name__icontains=actor_name)
-                query |= Q(actors__last_name__icontains=actor_name)
-                query |= Q(actors__full_name__icontains=actor_name)
+                name_parts = actor_name.split()
+                for part in name_parts:
+                    query |= Q(actors__first_name__icontains=part)
+                    query |= Q(actors__last_name__icontains=part)
             queryset = queryset.filter(query).distinct()
 
         return queryset
-
-    def get_serializer_class(self):
-        if self.action == "list":
-            return MovieListSerializer
-
-        if self.action == "retrieve":
-            return MovieDetailSerializer
-
-        return MovieSerializer
 
 
 class MovieSessionViewSet(viewsets.ModelViewSet):
@@ -128,6 +119,7 @@ class MovieSessionViewSet(viewsets.ModelViewSet):
 class OrderViewSet(viewsets.ModelViewSet):
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = PageNumberPagination
 
     def get_queryset(self):
         return Order.objects.filter(
