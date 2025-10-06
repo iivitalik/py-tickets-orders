@@ -71,7 +71,7 @@ class MovieViewSet(viewsets.ModelViewSet):
 
 class MovieSessionViewSet(viewsets.ModelViewSet):
     queryset = MovieSession.objects.select_related(
-        "movie", "cinema_hall").prefetch_related("tickets")
+         "movie", "cinema_hall").prefetch_related("tickets")
     serializer_class = MovieSessionSerializer
     pagination_class = None
 
