@@ -65,15 +65,15 @@ class MovieViewSet(viewsets.ModelViewSet):
         if title:
             queryset = queryset.filter(title__icontains=title)
 
-        genres = self.request.query_params.get("genres")
+        genres = self.request.query_params.getlist("genres")
         if genres:
-            queryset = queryset.filter(genres__name__in=[genres]).distinct()
+            queryset = queryset.filter(genres__name__in=genres).distinct()
 
-        actors = self.request.query_params.get("actors")
+        actors = self.request.query_params.getlist("actors")
         if actors:
             queryset = queryset.filter(
-                Q(actors__first_name__in=[actors])
-                | Q(actors__last_name__in=[actors])
+                Q(actors__first_name__in=actors) |
+                Q(actors__last_name__in=actors)
             ).distinct()
 
         return queryset
@@ -136,3 +136,13 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
