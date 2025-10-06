@@ -46,7 +46,6 @@ INSTALLED_APPS = [
     "debug_toolbar",
     "cinema",
     "user",
-    "django_filters",
 ]
 
 MIDDLEWARE = [
